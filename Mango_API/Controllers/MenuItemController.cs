@@ -1,6 +1,9 @@
 ﻿using Azure;
 using Mango_API.Data;
 using Mango_API.Models;
+using Mango_API.Models.Dto;
+using Mango_API.Services;
+using Mango_API.Utility;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -13,9 +16,11 @@ namespace Mango_API.Controllers
     {
         private readonly ApplicationDbContext _db;
         private ApiResponse _response;
-        public MenuItemController(ApplicationDbContext db)
+        private readonly IBlobService _blobService;
+        public MenuItemController(ApplicationDbContext db,IBlobService blobService)
         {
             _db = db;
+            _blobService = blobService;
             _response = new ApiResponse();
         }
 
@@ -46,6 +51,52 @@ namespace Mango_API.Controllers
             _response.Result = menuItem;
             _response.StatusCode = HttpStatusCode.OK;
             return Ok(_response);
+        }
+
+
+        [HttpPost]
+        public async Task<ActionResult<ApiResponse>> CreateMenuItem([FromForm] MenuItemCreateDTO menuItemCreateDTO)
+        {
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    if (menuItemCreateDTO.File == null || menuItemCreateDTO.File.Length == 0)
+                    {
+                        _response.StatusCode = HttpStatusCode.BadRequest;
+                        _response.IsSuccess = false;
+                        return BadRequest();
+                    }
+                    string fileName = $"{Guid.NewGuid()}{Path.GetExtension(menuItemCreateDTO.File.FileName)}";
+                    MenuItem menuItemToCreate = new()
+                    {
+                        Name = menuItemCreateDTO.Name,
+                        Price = menuItemCreateDTO.Price,
+                        Category = menuItemCreateDTO.Category,
+                        SpecialTag = menuItemCreateDTO.SpecialTag,
+                        Description = menuItemCreateDTO.Description,
+                        Image = await _blobService.UploadBlob(fileName, SD.SD_Storage_Container, menuItemCreateDTO.File)
+                    };
+                    _db.MenuItems.Add(menuItemToCreate);
+                    _db.SaveChanges();
+                    _response.Result = menuItemToCreate;
+                    _response.StatusCode = HttpStatusCode.Created;
+                    return CreatedAtRoute("GetMenuItem", new { id = menuItemToCreate.Id }, _response);
+
+                }
+                else
+                {
+                    _response.IsSuccess = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _response.IsSuccess = false;
+                _response.ErrorMessages
+                     = new List<string>() { ex.ToString() };
+            }
+
+            return _response;
         }
     }
 }
