@@ -1,5 +1,7 @@
+using Azure.Storage.Blobs;
 using Mango_API.Data;
 using Mango_API.Models;
+using Mango_API.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,7 +14,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 });
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>().AddEntityFrameworkStores<ApplicationDbContext>();
-
+builder.Services.AddSingleton(u => new BlobServiceClient(
+    builder.Configuration.GetConnectionString("DefaultDbConnection")));
+builder.Services.AddSingleton<IBlobService, BlobService>();
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 //builder.Services.AddOpenApi();
